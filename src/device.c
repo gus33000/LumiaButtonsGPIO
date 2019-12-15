@@ -61,9 +61,6 @@ VOID SubmitKeyPress(
     }
     }
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-        "Send called\n");
-
     NTSTATUS status;
     WDFREQUEST request = NULL;
     PBTN_REPORT hidReportRequestBuffer = { 0 };
@@ -119,7 +116,7 @@ VOID SubmitKeyPress(
     WdfRequestComplete(request, status);
 }
 
-void InterruBTNowerWorkItem(
+void InterruptPowerWorkItem(
     WDFINTERRUPT Interrupt,
     WDFOBJECT AssociatedObject
 )
@@ -128,9 +125,9 @@ void InterruBTNowerWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    SubmitKeyPress(devCtx, Power);
-
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Power!\n");
+
+    SubmitKeyPress(devCtx, Power);
 }
 
 void InterruptVolumeUpWorkItem(
@@ -142,9 +139,9 @@ void InterruptVolumeUpWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    SubmitKeyPress(devCtx, VolumeUp);
-
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeUp!\n");
+
+    SubmitKeyPress(devCtx, VolumeUp);
 }
 
 void InterruptVolumeDownWorkItem(
@@ -156,9 +153,9 @@ void InterruptVolumeDownWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    SubmitKeyPress(devCtx, VolumeDown);
-
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeDown!\n");
+
+    SubmitKeyPress(devCtx, VolumeDown);
 }
 
 void InterruptCameraFocusWorkItem(
@@ -170,9 +167,9 @@ void InterruptCameraFocusWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    SubmitKeyPress(devCtx, CameraFocus);
-
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from CameraFocus!\n");
+
+    SubmitKeyPress(devCtx, CameraFocus);
 }
 
 void InterruptCameraWorkItem(
@@ -184,9 +181,9 @@ void InterruptCameraWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    SubmitKeyPress(devCtx, Camera);
-
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Camera!\n");
+
+    SubmitKeyPress(devCtx, Camera);
 }
 
 BOOLEAN
@@ -322,7 +319,7 @@ LumiaButtonsGPIOProbeResources(
     interruptConfigPower.InterruptTranslated = WdfCmResourceListGetDescriptor(ResourcesTranslated, InterruBTNower);
     interruptConfigPower.InterruptRaw = WdfCmResourceListGetDescriptor(ResourcesRaw, InterruBTNower);
 
-    interruptConfigPower.EvtInterruptWorkItem = InterruBTNowerWorkItem;
+    interruptConfigPower.EvtInterruptWorkItem = InterruptPowerWorkItem;
 
     status = WdfInterruptCreate(
         DeviceContext->FxDevice,
