@@ -45,12 +45,13 @@ typedef struct _DEVICE_EXTENSION
     //
     // Interrupt servicing
     //
-    WDFINTERRUPT InterruBTNower;
+    WDFINTERRUPT InterruptPower;
     WDFINTERRUPT InterruptVolumeUp;
     WDFINTERRUPT InterruptVolumeDown;
     WDFINTERRUPT InterruptCameraFocus;
     WDFINTERRUPT InterruptCamera;
     BOOLEAN ServiceInterruptsAfterD0Entry;
+    BOOLEAN ProcessInterrupts;
     
     // 
     // Power related

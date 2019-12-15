@@ -41,6 +41,7 @@ VOID SubmitKeyPress(
 
         hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
         hidReportFromDriver.KeysData.Control.Power = deviceContext->StatePower;
+
         break;
     }
     case Camera:
@@ -59,6 +60,12 @@ VOID SubmitKeyPress(
         hidReportFromDriver.KeysData.Keyboard.Start = deviceContext->StateCameraFocus;
         break;
     }
+    }
+
+    if (!deviceContext->ProcessInterrupts)
+    {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Cancelling interrupt processing because we are not done initializing yet.\n");
+        return;
     }
 
     NTSTATUS status;
@@ -251,9 +258,11 @@ LumiaButtonsGPIOProbeResources(
     DeviceContext->StateCameraFocus = ButtonStateUnpressed;
     DeviceContext->StateCamera = ButtonStateUnpressed;
 
+    DeviceContext->ProcessInterrupts = FALSE;
+
     ULONG interruptFound = 0;
 
-    ULONG InterruBTNower = 0;
+    ULONG InterruptPower = 0;
     ULONG InterruptVolumeUp = 0;
     ULONG InterruptVolumeDown = 0;
     ULONG InterruptCameraFocus = 0;
@@ -277,7 +286,7 @@ LumiaButtonsGPIOProbeResources(
             switch (interruptFound)
             {
             case 0:
-                InterruBTNower = i;
+                InterruptPower = i;
                 break;
             case 1:
                 InterruptVolumeUp = i;
@@ -313,11 +322,13 @@ LumiaButtonsGPIOProbeResources(
         goto Exit;
     }
 
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Begin\n");
+
     WDF_INTERRUPT_CONFIG_INIT(&interruptConfigPower, OnInterruptIsr, NULL);
 
     interruptConfigPower.PassiveHandling = TRUE;
-    interruptConfigPower.InterruptTranslated = WdfCmResourceListGetDescriptor(ResourcesTranslated, InterruBTNower);
-    interruptConfigPower.InterruptRaw = WdfCmResourceListGetDescriptor(ResourcesRaw, InterruBTNower);
+    interruptConfigPower.InterruptTranslated = WdfCmResourceListGetDescriptor(ResourcesTranslated, InterruptPower);
+    interruptConfigPower.InterruptRaw = WdfCmResourceListGetDescriptor(ResourcesRaw, InterruptPower);
 
     interruptConfigPower.EvtInterruptWorkItem = InterruptPowerWorkItem;
 
@@ -325,13 +336,14 @@ LumiaButtonsGPIOProbeResources(
         DeviceContext->FxDevice,
         &interruptConfigPower,
         WDF_NO_OBJECT_ATTRIBUTES,
-        &DeviceContext->InterruBTNower);
+        &DeviceContext->InterruptPower);
     if (!NT_SUCCESS(status))
     {
         DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: WdfInterruptCreate failed for Power %x\n", status);
         goto Exit;
     }
 
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
 
     WDF_INTERRUPT_CONFIG_INIT(&interruptConfigVolumeUp, OnInterruptIsr, NULL);
 
@@ -352,6 +364,8 @@ LumiaButtonsGPIOProbeResources(
         goto Exit;
     }
 
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
+
     WDF_INTERRUPT_CONFIG_INIT(&interruptConfigVolumeDown, OnInterruptIsr, NULL);
 
     interruptConfigVolumeDown.PassiveHandling = TRUE;
@@ -370,6 +384,8 @@ LumiaButtonsGPIOProbeResources(
         DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: WdfInterruptCreate failed for VolumeDown %x\n", status);
         goto Exit;
     }
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
 
     WDF_INTERRUPT_CONFIG_INIT(&interruptConfigCameraFocus, OnInterruptIsr, NULL);
 
@@ -390,6 +406,8 @@ LumiaButtonsGPIOProbeResources(
         goto Exit;
     }
 
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
+
     WDF_INTERRUPT_CONFIG_INIT(&interruptConfigCamera, OnInterruptIsr, NULL);
 
     interruptConfigCamera.PassiveHandling = TRUE;
@@ -408,6 +426,8 @@ LumiaButtonsGPIOProbeResources(
         DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: WdfInterruptCreate failed for Camera %x\n", status);
         goto Exit;
     }
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
 
 Exit:
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: LumiaButtonsGPIOProbeResources Exit: %x\n", status);
@@ -591,3 +611,21 @@ OnReleaseHardware(
     return status;
 }
 
+NTSTATUS OnD0EntryPostInterruptsEnabled
+(
+    IN WDFDEVICE Device,
+    IN WDF_POWER_DEVICE_STATE PreviousState
+)
+{
+    UNREFERENCED_PARAMETER(PreviousState);
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: OnD0EntryPostInterruptsEnabled Entry\n");
+
+    PDEVICE_EXTENSION DeviceContext = GetDeviceContext(Device);
+
+    DeviceContext->ProcessInterrupts = TRUE;
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: OnD0EntryPostInterruptsEnabled Exit\n");
+
+    return 0;
+}

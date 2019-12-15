@@ -131,6 +131,7 @@ Return Value:
     pnpPowerCallbacks.EvtDeviceD0Exit  = OnD0Exit;
     pnpPowerCallbacks.EvtDevicePrepareHardware = OnPrepareHardware;
     pnpPowerCallbacks.EvtDeviceReleaseHardware = OnReleaseHardware;
+    pnpPowerCallbacks.EvtDeviceD0EntryPostInterruptsEnabled = OnD0EntryPostInterruptsEnabled;
 
     WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnpPowerCallbacks);
     
