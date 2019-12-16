@@ -26,7 +26,8 @@ typedef enum _BUTTON_TYPE
     VolumeUp,
     VolumeDown,
     CameraFocus,
-    Camera
+    Camera,
+    Slider
 } BUTTON_TYPE;
 
 //
@@ -50,6 +51,7 @@ typedef struct _DEVICE_EXTENSION
     WDFINTERRUPT InterruptVolumeDown;
     WDFINTERRUPT InterruptCameraFocus;
     WDFINTERRUPT InterruptCamera;
+    WDFINTERRUPT InterruptSlider;
     BOOLEAN ServiceInterruptsAfterD0Entry;
     BOOLEAN ProcessInterrupts;
     
@@ -66,6 +68,7 @@ typedef struct _DEVICE_EXTENSION
     BUTTON_STATE StateVolumeDown;
     BUTTON_STATE StateCameraFocus;
     BUTTON_STATE StateCamera;
+    BUTTON_STATE StateSlider;
 
 } DEVICE_EXTENSION, *PDEVICE_EXTENSION;
 
@@ -94,7 +97,8 @@ typedef struct _BTN_REPORT {
         struct
         {
             BYTE Power : 1;
-            BYTE Reserved : 7;
+            BYTE RotationLockSwitch : 1;
+            BYTE Reserved : 6;
         } Control;
         BYTE Raw;
     } KeysData;

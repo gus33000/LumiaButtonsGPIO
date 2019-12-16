@@ -15,6 +15,12 @@ VOID SubmitKeyPress(
     _In_ PDEVICE_EXTENSION deviceContext,
     _In_ BUTTON_TYPE  ButtonType)
 {
+    if (!deviceContext->ProcessInterrupts)
+    {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Cancelling interrupt processing because we are not done initializing yet.\n");
+        return;
+    }
+
     BTN_REPORT hidReportFromDriver = { 0 };
 
     switch (ButtonType)
@@ -60,12 +66,14 @@ VOID SubmitKeyPress(
         hidReportFromDriver.KeysData.Keyboard.Start = deviceContext->StateCameraFocus;
         break;
     }
-    }
-
-    if (!deviceContext->ProcessInterrupts)
+    case Slider:
     {
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Cancelling interrupt processing because we are not done initializing yet.\n");
-        return;
+        deviceContext->StateSlider = !deviceContext->StateSlider;
+
+        hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
+        hidReportFromDriver.KeysData.Control.RotationLockSwitch = deviceContext->StateSlider;
+        break;
+    }
     }
 
     NTSTATUS status;
@@ -193,6 +201,20 @@ void InterruptCameraWorkItem(
     SubmitKeyPress(devCtx, Camera);
 }
 
+void InterruptSliderWorkItem(
+    WDFINTERRUPT Interrupt,
+    WDFOBJECT AssociatedObject
+)
+{
+    UNREFERENCED_PARAMETER(Interrupt);
+
+    PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Slider!\n");
+
+    SubmitKeyPress(devCtx, Slider);
+}
+
 BOOLEAN
 OnInterruptIsr(
     IN WDFINTERRUPT Interrupt,
@@ -249,6 +271,7 @@ LumiaButtonsGPIOProbeResources(
     WDF_INTERRUPT_CONFIG interruptConfigVolumeDown;
     WDF_INTERRUPT_CONFIG interruptConfigCameraFocus;
     WDF_INTERRUPT_CONFIG interruptConfigCamera;
+    WDF_INTERRUPT_CONFIG interruptConfigSlider;
 
     PCM_PARTIAL_RESOURCE_DESCRIPTOR descriptor = NULL;
 
@@ -257,6 +280,7 @@ LumiaButtonsGPIOProbeResources(
     DeviceContext->StateVolumeDown = ButtonStateUnpressed;
     DeviceContext->StateCameraFocus = ButtonStateUnpressed;
     DeviceContext->StateCamera = ButtonStateUnpressed;
+    DeviceContext->StateSlider = ButtonStateUnpressed;
 
     DeviceContext->ProcessInterrupts = FALSE;
 
@@ -267,6 +291,7 @@ LumiaButtonsGPIOProbeResources(
     ULONG InterruptVolumeDown = 0;
     ULONG InterruptCameraFocus = 0;
     ULONG InterruptCamera = 0;
+    ULONG InterruptSlider = 0;
 
     ULONG resourceCount;
 
@@ -300,6 +325,9 @@ LumiaButtonsGPIOProbeResources(
             case 4:
                 InterruptCamera = i;
                 break;
+            case 5:
+                InterruptSlider = i;
+                break;
             default:
                 break;
             }
@@ -315,7 +343,7 @@ LumiaButtonsGPIOProbeResources(
         }
     }
 
-    if (interruptFound < 5)
+    if (interruptFound < 3)
     {
         DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Not all resources were found, Interrupts = %d\n", interruptFound);
         status = STATUS_INSUFFICIENT_RESOURCES;
@@ -387,47 +415,77 @@ LumiaButtonsGPIOProbeResources(
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
 
-    WDF_INTERRUPT_CONFIG_INIT(&interruptConfigCameraFocus, OnInterruptIsr, NULL);
-
-    interruptConfigCameraFocus.PassiveHandling = TRUE;
-    interruptConfigCameraFocus.InterruptTranslated = WdfCmResourceListGetDescriptor(ResourcesTranslated, InterruptCameraFocus);
-    interruptConfigCameraFocus.InterruptRaw = WdfCmResourceListGetDescriptor(ResourcesRaw, InterruptCameraFocus);
-
-    interruptConfigCameraFocus.EvtInterruptWorkItem = InterruptCameraFocusWorkItem;
-
-    status = WdfInterruptCreate(
-        DeviceContext->FxDevice,
-        &interruptConfigCameraFocus,
-        WDF_NO_OBJECT_ATTRIBUTES,
-        &DeviceContext->InterruptCameraFocus);
-    if (!NT_SUCCESS(status))
+    if (interruptFound >= 5)
     {
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: WdfInterruptCreate failed for CameraFocus %x\n", status);
-        goto Exit;
+        WDF_INTERRUPT_CONFIG_INIT(&interruptConfigCameraFocus, OnInterruptIsr, NULL);
+
+        interruptConfigCameraFocus.PassiveHandling = TRUE;
+        interruptConfigCameraFocus.InterruptTranslated = WdfCmResourceListGetDescriptor(ResourcesTranslated, InterruptCameraFocus);
+        interruptConfigCameraFocus.InterruptRaw = WdfCmResourceListGetDescriptor(ResourcesRaw, InterruptCameraFocus);
+
+        interruptConfigCameraFocus.EvtInterruptWorkItem = InterruptCameraFocusWorkItem;
+
+        status = WdfInterruptCreate(
+            DeviceContext->FxDevice,
+            &interruptConfigCameraFocus,
+            WDF_NO_OBJECT_ATTRIBUTES,
+            &DeviceContext->InterruptCameraFocus);
+        if (!NT_SUCCESS(status))
+        {
+            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: WdfInterruptCreate failed for CameraFocus %x\n", status);
+            goto Exit;
+        }
+
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
+
+        WDF_INTERRUPT_CONFIG_INIT(&interruptConfigCamera, OnInterruptIsr, NULL);
+
+        interruptConfigCamera.PassiveHandling = TRUE;
+        interruptConfigCamera.InterruptTranslated = WdfCmResourceListGetDescriptor(ResourcesTranslated, InterruptCamera);
+        interruptConfigCamera.InterruptRaw = WdfCmResourceListGetDescriptor(ResourcesRaw, InterruptCamera);
+
+        interruptConfigCamera.EvtInterruptWorkItem = InterruptCameraWorkItem;
+
+        status = WdfInterruptCreate(
+            DeviceContext->FxDevice,
+            &interruptConfigCamera,
+            WDF_NO_OBJECT_ATTRIBUTES,
+            &DeviceContext->InterruptCamera);
+        if (!NT_SUCCESS(status))
+        {
+            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: WdfInterruptCreate failed for Camera %x\n", status);
+            goto Exit;
+        }
+
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
+
+        if (interruptFound >= 6)
+        {
+
+            WDF_INTERRUPT_CONFIG_INIT(&interruptConfigSlider, OnInterruptIsr, NULL);
+
+            interruptConfigSlider.PassiveHandling = TRUE;
+            interruptConfigSlider.InterruptTranslated = WdfCmResourceListGetDescriptor(ResourcesTranslated, InterruptSlider);
+            interruptConfigSlider.InterruptRaw = WdfCmResourceListGetDescriptor(ResourcesRaw, InterruptSlider);
+
+            interruptConfigSlider.EvtInterruptWorkItem = InterruptSliderWorkItem;
+
+            status = WdfInterruptCreate(
+                DeviceContext->FxDevice,
+                &interruptConfigSlider,
+                WDF_NO_OBJECT_ATTRIBUTES,
+                &DeviceContext->InterruptSlider);
+            if (!NT_SUCCESS(status))
+            {
+                DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: WdfInterruptCreate failed for Slider %x\n", status);
+                goto Exit;
+            }
+
+            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
+
+        }
     }
-
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
-
-    WDF_INTERRUPT_CONFIG_INIT(&interruptConfigCamera, OnInterruptIsr, NULL);
-
-    interruptConfigCamera.PassiveHandling = TRUE;
-    interruptConfigCamera.InterruptTranslated = WdfCmResourceListGetDescriptor(ResourcesTranslated, InterruptCamera);
-    interruptConfigCamera.InterruptRaw = WdfCmResourceListGetDescriptor(ResourcesRaw, InterruptCamera);
-
-    interruptConfigCamera.EvtInterruptWorkItem = InterruptCameraWorkItem;
-
-    status = WdfInterruptCreate(
-        DeviceContext->FxDevice,
-        &interruptConfigCamera,
-        WDF_NO_OBJECT_ATTRIBUTES,
-        &DeviceContext->InterruptCamera);
-    if (!NT_SUCCESS(status))
-    {
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: WdfInterruptCreate failed for Camera %x\n", status);
-        goto Exit;
-    }
-
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Created Interrupt\n");
+    
 
 Exit:
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: LumiaButtonsGPIOProbeResources Exit: %x\n", status);
