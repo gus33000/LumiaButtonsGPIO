@@ -131,7 +131,7 @@ VOID EvaluateButtonAction(
                 // Power
 
                 hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
-                hidReportFromDriver.KeysData.Control.SystemPower = deviceContext->StatePower;
+                hidReportFromDriver.KeysData.Control.SystemPowerDown = deviceContext->StatePower;
                 SendReport(deviceContext, hidReportFromDriver);
             }
 

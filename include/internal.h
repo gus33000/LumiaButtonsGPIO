@@ -40,24 +40,26 @@ typedef struct _BTN_REPORT {
     {
         struct
         {
-            BYTE Del : 1;
-            BYTE F14 : 1;
-            BYTE F15 : 1;
+            BYTE Del      : 1;
+            BYTE F14      : 1;
+            BYTE F15      : 1;
             BYTE LeftCtrl : 1;
-            BYTE LeftAlt : 1;
-            BYTE LeftWin : 1;
+            BYTE LeftAlt  : 1;
+            BYTE LeftWin  : 1;
             BYTE Reserved : 1;
         } Keyboard;
         struct
         {
-            BYTE VolumeUp : 1;
+            BYTE VolumeUp   : 1;
             BYTE VolumeDown : 1;
-            BYTE Reserved : 6;
+            BYTE Reserved   : 6;
         } Consumer;
         struct
         {
-            BYTE SystemPower : 1;
-            BYTE Reserved : 7;
+            BYTE SystemPowerDown : 1;
+            BYTE SystemWakeUp    : 1;
+            BYTE SystemPower     : 1;
+            BYTE Reserved        : 5;
         } Control;
         BYTE Raw;
     } KeysData;

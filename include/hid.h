@@ -105,14 +105,16 @@ BtnReadReport(
             BEGIN_COLLECTION, 0x01,                     /*Application*/     \
                 REPORT_ID, REPORTID_CAPKEY_CONTROL,                         \
                                                                             \
+                USAGE, 0x81,                         /* System power down */\
+                USAGE, 0x83,                            /* System wake up */\
                 USAGE, 0x84,                            /* System power */  \
                                                                             \
                 LOGICAL_MINIMUM, 0x00,                                      \
                 LOGICAL_MAXIMUM, 0x01,                                      \
                 REPORT_SIZE, 0x01,                                          \
-                REPORT_COUNT, 0x01,                                         \
+                REPORT_COUNT, 0x03,                                         \
                 INPUT, 0x02,                            /*(Data,Var,Abs)*/  \
                 REPORT_COUNT, 0x01,                                         \
-                REPORT_SIZE, 0x07,                                          \
+                REPORT_SIZE, 0x05,                                          \
                 INPUT, 0x03,                            /*(Cnst,Var,Abs)*/  \
             END_COLLECTION
