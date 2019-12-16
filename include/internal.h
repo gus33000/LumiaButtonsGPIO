@@ -10,25 +10,58 @@
 #include <reshub.h>
 #include "trace.h"
 
+//
+// HID descriptor & reporting
+//
+
 #define REPORTID_CAPKEY_KEYBOARD        4
 #define REPORTID_CAPKEY_CONSUMER        5
 #define REPORTID_CAPKEY_CONTROL         6
 
 typedef enum _BUTTON_STATE
 {
-    ButtonStateUnpressed,
-    ButtonStatePressed
+    ButtonStateUnpressed = 0,
+    ButtonStatePressed = 1
 } BUTTON_STATE;
 
 typedef enum _BUTTON_TYPE
 {
-    Power,
+    Power = 0,
     VolumeUp,
     VolumeDown,
     CameraFocus,
     Camera,
     Slider
 } BUTTON_TYPE;
+
+typedef struct _BTN_REPORT {
+    UCHAR       ReportID;
+    union
+    {
+        struct
+        {
+            BYTE Del : 1;
+            BYTE F14 : 1;
+            BYTE F15 : 1;
+            BYTE LeftCtrl : 1;
+            BYTE LeftAlt : 1;
+            BYTE LeftWin : 1;
+            BYTE Reserved : 1;
+        } Keyboard;
+        struct
+        {
+            BYTE VolumeUp : 1;
+            BYTE VolumeDown : 1;
+            BYTE Reserved : 6;
+        } Consumer;
+        struct
+        {
+            BYTE SystemPower : 1;
+            BYTE Reserved : 7;
+        } Control;
+        BYTE Raw;
+    } KeysData;
+} BTN_REPORT, * PBTN_REPORT;
 
 //
 // Device context
@@ -78,28 +111,3 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(DEVICE_EXTENSION, GetDeviceContext)
 // Memory tags
 //
 #define BTN_POOL_TAG                  (ULONG)'ntuB'
-
-typedef struct _BTN_REPORT {
-    UCHAR       ReportID;
-    union
-    {
-        struct
-        {
-            BYTE Start : 1;
-            BYTE Reserved : 7;
-        } Keyboard;
-        struct
-        {
-            BYTE VolumeUp : 1;
-            BYTE VolumeDown : 1;
-            BYTE Reserved : 6;
-        } Consumer;
-        struct
-        {
-            BYTE Power : 1;
-            BYTE RotationLockSwitch : 1;
-            BYTE Reserved : 6;
-        } Control;
-        BYTE Raw;
-    } KeysData;
-} BTN_REPORT, * PBTN_REPORT;

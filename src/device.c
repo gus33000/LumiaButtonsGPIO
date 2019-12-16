@@ -11,73 +11,11 @@
   #pragma alloc_text(PAGE, OnD0Exit)
 #endif
 
-VOID SubmitKeyPress(
-    _In_ PDEVICE_EXTENSION deviceContext,
-    _In_ BUTTON_TYPE  ButtonType)
+VOID SendReport(
+    IN PDEVICE_EXTENSION deviceContext,
+    IN BTN_REPORT hidReportFromDriver
+)
 {
-    if (!deviceContext->ProcessInterrupts)
-    {
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Cancelling interrupt processing because we are not done initializing yet.\n");
-        return;
-    }
-
-    BTN_REPORT hidReportFromDriver = { 0 };
-
-    switch (ButtonType)
-    {
-    case VolumeUp:
-    {
-        deviceContext->StateVolumeUp = !deviceContext->StateVolumeUp;
-
-        hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONSUMER;
-        hidReportFromDriver.KeysData.Consumer.VolumeUp = deviceContext->StateVolumeUp;
-        break;
-    }
-    case VolumeDown:
-    {
-        deviceContext->StateVolumeDown = !deviceContext->StateVolumeDown;
-
-        hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONSUMER;
-        hidReportFromDriver.KeysData.Consumer.VolumeDown = deviceContext->StateVolumeDown;
-        break;
-    }
-    case Power:
-    {
-        deviceContext->StatePower = !deviceContext->StatePower;
-
-        hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
-        hidReportFromDriver.KeysData.Control.Power = deviceContext->StatePower;
-
-        break;
-    }
-    case Camera:
-    {
-        deviceContext->StateCamera = !deviceContext->StateCamera;
-
-        hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
-        hidReportFromDriver.KeysData.Keyboard.Start = deviceContext->StateCamera;
-        break;
-    }
-    case CameraFocus:
-    {
-        deviceContext->StateCameraFocus = !deviceContext->StateCameraFocus;
-
-        hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
-        hidReportFromDriver.KeysData.Keyboard.Start = deviceContext->StateCameraFocus;
-        break;
-    }
-    case Slider:
-    {
-        deviceContext->StateSlider = !deviceContext->StateSlider;
-
-        //hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
-        //hidReportFromDriver.KeysData.Control.RotationLockSwitch = deviceContext->StateSlider;
-        hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
-        hidReportFromDriver.KeysData.Keyboard.Start = deviceContext->StateSlider;
-        break;
-    }
-    }
-
     NTSTATUS status;
     WDFREQUEST request = NULL;
     PBTN_REPORT hidReportRequestBuffer = { 0 };
@@ -131,65 +69,191 @@ VOID SubmitKeyPress(
     }
 
     WdfRequestComplete(request, status);
+}
 
-    if (ButtonType == Slider)
+VOID EvaluateButtonAction(
+    IN PDEVICE_EXTENSION deviceContext,
+    IN BUTTON_TYPE ButtonType
+)
+{
+    BTN_REPORT hidReportFromDriver = { 0 };
+
+    int RelevantButtonActiveCount = (int)deviceContext->StateCamera + (int)deviceContext->StateCameraFocus +
+                                    (int)deviceContext->StatePower +
+                                    (int)deviceContext->StateVolumeUp + (int)deviceContext->StateVolumeDown;
+
+    if (RelevantButtonActiveCount <= 2)
+    {
+        // Trigger on Volume Up being high
+        if (deviceContext->InterruptPower && deviceContext->StateVolumeUp && ButtonType == VolumeUp)
+        {
+            // Power + Volume Up (High)
+            // WIN + F15
+
+            hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+            hidReportFromDriver.KeysData.Keyboard.LeftWin = ButtonStatePressed;
+            hidReportFromDriver.KeysData.Keyboard.F15 = ButtonStatePressed;
+            SendReport(deviceContext, hidReportFromDriver);
+
+            // Unpress the keys immediately
+            hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+            hidReportFromDriver.KeysData.Keyboard.LeftWin = ButtonStateUnpressed;
+            hidReportFromDriver.KeysData.Keyboard.F15 = ButtonStateUnpressed;
+            SendReport(deviceContext, hidReportFromDriver);
+        }
+        // Trigger on Volume Down being high
+        else if (deviceContext->InterruptPower && deviceContext->StateVolumeDown && ButtonType == VolumeDown)
+        {
+            // Power + Volume Down (High)
+            // CTRL + ALT + DEL
+
+            hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+            hidReportFromDriver.KeysData.Keyboard.LeftCtrl = ButtonStatePressed;
+            hidReportFromDriver.KeysData.Keyboard.LeftAlt = ButtonStatePressed;
+            hidReportFromDriver.KeysData.Keyboard.Del = ButtonStatePressed;
+            SendReport(deviceContext, hidReportFromDriver);
+
+            // Unpress the keys immediately
+            hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+            hidReportFromDriver.KeysData.Keyboard.LeftCtrl = ButtonStateUnpressed;
+            hidReportFromDriver.KeysData.Keyboard.LeftAlt = ButtonStateUnpressed;
+            hidReportFromDriver.KeysData.Keyboard.Del = ButtonStateUnpressed;
+            SendReport(deviceContext, hidReportFromDriver);
+        }
+        //
+        // Only one key should be active at a time after checking the above combinations
+        // The only exception is the slider where we can expect it to be enabled with other keys
+        //
+        else if (RelevantButtonActiveCount <= 1)
+        {
+            if (ButtonType == Power)
+            {
+                // Power
+
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
+                hidReportFromDriver.KeysData.Control.SystemPower = deviceContext->StatePower;
+                SendReport(deviceContext, hidReportFromDriver);
+            }
+
+            if (ButtonType == VolumeUp)
+            {
+                // Volume Up
+
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONSUMER;
+                hidReportFromDriver.KeysData.Consumer.VolumeUp = deviceContext->StateVolumeUp;
+                SendReport(deviceContext, hidReportFromDriver);
+            }
+
+            if (ButtonType == VolumeDown)
+            {
+                // Volume Down
+
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONSUMER;
+                hidReportFromDriver.KeysData.Consumer.VolumeDown = deviceContext->StateVolumeDown;
+                SendReport(deviceContext, hidReportFromDriver);
+            }
+
+            if (ButtonType == CameraFocus)
+            {
+                // Camera Focus
+                // Placeholder
+
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+                hidReportFromDriver.KeysData.Keyboard.LeftWin = deviceContext->StateCameraFocus;
+                SendReport(deviceContext, hidReportFromDriver);
+            }
+
+            if (ButtonType == Camera)
+            {
+                // Camera
+                // Placeholder
+
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+                hidReportFromDriver.KeysData.Keyboard.LeftWin = deviceContext->StateCamera;
+                SendReport(deviceContext, hidReportFromDriver);
+            }
+
+            if (deviceContext->StateSlider && ButtonType == Slider)
+            {
+                // Slider on
+                // WIN + F14
+
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+                hidReportFromDriver.KeysData.Keyboard.LeftWin = ButtonStatePressed;
+                hidReportFromDriver.KeysData.Keyboard.F14 = ButtonStatePressed;
+                SendReport(deviceContext, hidReportFromDriver);
+
+                // Unpress the keys immediately
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+                hidReportFromDriver.KeysData.Keyboard.LeftWin = ButtonStateUnpressed;
+                hidReportFromDriver.KeysData.Keyboard.F14 = ButtonStateUnpressed;
+                SendReport(deviceContext, hidReportFromDriver);
+            }
+            else if (!deviceContext->StateSlider && ButtonType == Slider)
+            {
+                // Slider off
+                // WIN + F14
+
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+                hidReportFromDriver.KeysData.Keyboard.LeftWin = ButtonStatePressed;
+                hidReportFromDriver.KeysData.Keyboard.F14 = ButtonStatePressed;
+                SendReport(deviceContext, hidReportFromDriver);
+
+                // Unpress the keys immediately
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+                hidReportFromDriver.KeysData.Keyboard.LeftWin = ButtonStateUnpressed;
+                hidReportFromDriver.KeysData.Keyboard.F14 = ButtonStateUnpressed;
+                SendReport(deviceContext, hidReportFromDriver);
+            }
+        }
+    }
+}
+
+VOID HandleButtonPress(
+    IN PDEVICE_EXTENSION deviceContext,
+    IN BUTTON_TYPE ButtonType)
+{
+    if (!deviceContext->ProcessInterrupts)
+    {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Cancelling interrupt processing because we are not done initializing yet.\n");
+        return;
+    }
+
+    switch (ButtonType)
+    {
+    case VolumeUp:
+    {
+        deviceContext->StateVolumeUp = !deviceContext->StateVolumeUp;
+        break;
+    }
+    case VolumeDown:
+    {
+        deviceContext->StateVolumeDown = !deviceContext->StateVolumeDown;
+        break;
+    }
+    case Power:
+    {
+        deviceContext->StatePower = !deviceContext->StatePower;
+        break;
+    }
+    case Camera:
+    {
+        deviceContext->StateCamera = !deviceContext->StateCamera;
+        break;
+    }
+    case CameraFocus:
+    {
+        deviceContext->StateCameraFocus = !deviceContext->StateCameraFocus;
+        break;
+    }
+    case Slider:
     {
         deviceContext->StateSlider = !deviceContext->StateSlider;
-
-        //hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
-        //hidReportFromDriver.KeysData.Control.RotationLockSwitch = deviceContext->StateSlider;
-        hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
-        hidReportFromDriver.KeysData.Keyboard.Start = deviceContext->StateSlider;
-
-        status = WdfIoQueueRetrieveNextRequest(
-            deviceContext->PingPongQueue,
-            &request);
-
-        if (!NT_SUCCESS(status))
-        {
-            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "No request pending from HIDClass, ignoring report - STATUS:%X",
-                status);
-        }
-
-        status = WdfRequestRetrieveOutputBuffer(
-            request,
-            sizeof(BTN_REPORT),
-            &hidReportRequestBuffer,
-            &hidReportRequestBufferLength);
-
-        if (!NT_SUCCESS(status))
-        {
-            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
-                "Error retrieving HID read request output buffer - STATUS:%X",
-                status);
-        }
-        else
-        {
-            //
-            // Validate the size of the output buffer
-            //
-            if (hidReportRequestBufferLength < sizeof(BTN_REPORT))
-            {
-                status = STATUS_BUFFER_TOO_SMALL;
-
-                DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Error HID read request buffer is too small (%d bytes) - STATUS:%X\n",
-                    hidReportRequestBufferLength,
-                    status);
-            }
-            else
-            {
-                RtlCopyMemory(
-                    hidReportRequestBuffer,
-                    &hidReportFromDriver,
-                    sizeof(BTN_REPORT));
-
-                WdfRequestSetInformation(request, sizeof(BTN_REPORT));
-            }
-        }
-
-        WdfRequestComplete(request, status);
+        break;
     }
+    }
+
+    EvaluateButtonAction(deviceContext, ButtonType);
 }
 
 void InterruptPowerWorkItem(
@@ -201,9 +265,9 @@ void InterruptPowerWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Power!\n");
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Power!\n");
 
-    SubmitKeyPress(devCtx, Power);
+    HandleButtonPress(devCtx, Power);
 }
 
 void InterruptVolumeUpWorkItem(
@@ -215,9 +279,9 @@ void InterruptVolumeUpWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeUp!\n");
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeUp!\n");
 
-    SubmitKeyPress(devCtx, VolumeUp);
+    HandleButtonPress(devCtx, VolumeUp);
 }
 
 void InterruptVolumeDownWorkItem(
@@ -229,9 +293,9 @@ void InterruptVolumeDownWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeDown!\n");
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeDown!\n");
 
-    SubmitKeyPress(devCtx, VolumeDown);
+    HandleButtonPress(devCtx, VolumeDown);
 }
 
 void InterruptCameraFocusWorkItem(
@@ -243,9 +307,9 @@ void InterruptCameraFocusWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from CameraFocus!\n");
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from CameraFocus!\n");
 
-    SubmitKeyPress(devCtx, CameraFocus);
+    HandleButtonPress(devCtx, CameraFocus);
 }
 
 void InterruptCameraWorkItem(
@@ -257,9 +321,9 @@ void InterruptCameraWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Camera!\n");
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Camera!\n");
 
-    SubmitKeyPress(devCtx, Camera);
+    HandleButtonPress(devCtx, Camera);
 }
 
 void InterruptSliderWorkItem(
@@ -271,9 +335,9 @@ void InterruptSliderWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Slider!\n");
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Slider!\n");
 
-    SubmitKeyPress(devCtx, Slider);
+    HandleButtonPress(devCtx, Slider);
 }
 
 BOOLEAN
@@ -306,11 +370,11 @@ OnInterruptIsr(
 {
     UNREFERENCED_PARAMETER(MessageID);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: EvtInterruptIsr Entry\n");
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: EvtInterruptIsr Entry\n");
 
     WdfInterruptQueueWorkItemForIsr(Interrupt);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: EvtInterruptIsr Exit\n");
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: EvtInterruptIsr Exit\n");
 
     return TRUE;
 }
@@ -411,7 +475,7 @@ LumiaButtonsGPIOProbeResources(
         goto Exit;
     }
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Begin\n");
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Beginning to create interrupts\n");
 
     WDF_INTERRUPT_CONFIG_INIT(&interruptConfigPower, OnInterruptIsr, NULL);
 
