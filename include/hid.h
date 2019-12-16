@@ -78,7 +78,7 @@ BtnReadReport(
                 REPORT_COUNT, 0x06,                                         \
                 INPUT, 0x02,                            /* Data,Var,Abs */  \
                 REPORT_COUNT, 0x01,                                         \
-                REPORT_SIZE, 0x01,                      /* Cnst,Var,Abs */  \
+                REPORT_SIZE, 0x02,                      /* Cnst,Var,Abs */  \
                 INPUT, 0x03,                                                \
             END_COLLECTION,                                                 \
                                                                             \

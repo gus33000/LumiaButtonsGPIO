@@ -85,7 +85,7 @@ VOID EvaluateButtonAction(
     if (RelevantButtonActiveCount <= 2)
     {
         // Trigger on Volume Up being high
-        if (deviceContext->InterruptPower && deviceContext->StateVolumeUp && ButtonType == VolumeUp)
+        if (deviceContext->StatePower && deviceContext->StateVolumeUp && ButtonType == VolumeUp)
         {
             // Power + Volume Up (High)
             // WIN + F15
@@ -102,7 +102,7 @@ VOID EvaluateButtonAction(
             SendReport(deviceContext, hidReportFromDriver);
         }
         // Trigger on Volume Down being high
-        else if (deviceContext->InterruptPower && deviceContext->StateVolumeDown && ButtonType == VolumeDown)
+        else if (deviceContext->StatePower && deviceContext->StateVolumeDown && ButtonType == VolumeDown)
         {
             // Power + Volume Down (High)
             // CTRL + ALT + DEL
