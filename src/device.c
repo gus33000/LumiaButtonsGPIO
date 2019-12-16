@@ -70,8 +70,10 @@ VOID SubmitKeyPress(
     {
         deviceContext->StateSlider = !deviceContext->StateSlider;
 
-        hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
-        hidReportFromDriver.KeysData.Control.RotationLockSwitch = deviceContext->StateSlider;
+        //hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
+        //hidReportFromDriver.KeysData.Control.RotationLockSwitch = deviceContext->StateSlider;
+        hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+        hidReportFromDriver.KeysData.Keyboard.Start = deviceContext->StateSlider;
         break;
     }
     }
@@ -134,8 +136,10 @@ VOID SubmitKeyPress(
     {
         deviceContext->StateSlider = !deviceContext->StateSlider;
 
-        hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
-        hidReportFromDriver.KeysData.Control.RotationLockSwitch = deviceContext->StateSlider;
+        //hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
+        //hidReportFromDriver.KeysData.Control.RotationLockSwitch = deviceContext->StateSlider;
+        hidReportFromDriver.ReportID = REPORTID_CAPKEY_KEYBOARD;
+        hidReportFromDriver.KeysData.Keyboard.Start = deviceContext->StateSlider;
 
         status = WdfIoQueueRetrieveNextRequest(
             deviceContext->PingPongQueue,
