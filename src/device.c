@@ -129,6 +129,63 @@ VOID SubmitKeyPress(
     }
 
     WdfRequestComplete(request, status);
+
+    if (ButtonType == Slider)
+    {
+        deviceContext->StateSlider = !deviceContext->StateSlider;
+
+        hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
+        hidReportFromDriver.KeysData.Control.RotationLockSwitch = deviceContext->StateSlider;
+
+        status = WdfIoQueueRetrieveNextRequest(
+            deviceContext->PingPongQueue,
+            &request);
+
+        if (!NT_SUCCESS(status))
+        {
+            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+                "No request pending from HIDClass, ignoring report - STATUS:%X",
+                status);
+        }
+
+        status = WdfRequestRetrieveOutputBuffer(
+            request,
+            sizeof(BTN_REPORT),
+            &hidReportRequestBuffer,
+            &hidReportRequestBufferLength);
+
+        if (!NT_SUCCESS(status))
+        {
+            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+                "Error retrieving HID read request output buffer - STATUS:%X",
+                status);
+        }
+        else
+        {
+            //
+            // Validate the size of the output buffer
+            //
+            if (hidReportRequestBufferLength < sizeof(BTN_REPORT))
+            {
+                status = STATUS_BUFFER_TOO_SMALL;
+
+                DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Error HID read request buffer is too small (%d bytes) - STATUS:%X\n",
+                    hidReportRequestBufferLength,
+                    status);
+            }
+            else
+            {
+                RtlCopyMemory(
+                    hidReportRequestBuffer,
+                    &hidReportFromDriver,
+                    sizeof(BTN_REPORT));
+
+                WdfRequestSetInformation(request, sizeof(BTN_REPORT));
+            }
+        }
+
+        WdfRequestComplete(request, status);
+    }
 }
 
 void InterruptPowerWorkItem(
