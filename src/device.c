@@ -126,12 +126,17 @@ VOID EvaluateButtonAction(
         //
         else if (RelevantButtonActiveCount <= 1)
         {
-            if (ButtonType == Power)
+            // Trigger on power being low
+            if (ButtonType == Power && !deviceContext->StatePower)
             {
                 // Power
-
                 hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
-                hidReportFromDriver.KeysData.Control.SystemPowerDown = deviceContext->StatePower;
+                hidReportFromDriver.KeysData.Control.SystemPowerDown = ButtonStatePressed;
+                SendReport(deviceContext, hidReportFromDriver);
+
+                // Unpress the key immediately
+                hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
+                hidReportFromDriver.KeysData.Control.SystemPowerDown = ButtonStateUnpressed;
                 SendReport(deviceContext, hidReportFromDriver);
             }
 
