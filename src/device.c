@@ -283,8 +283,8 @@ void InterruptPowerWorkItem(
 
     if (devCtx->InitializationOk == 2)
         HandleButtonPress(devCtx, Power);
-
-    devCtx->InitializationOk++;
+    else
+        devCtx->InitializationOk++;
 }
 
 void InterruptVolumeUpWorkItem(
@@ -298,10 +298,10 @@ void InterruptVolumeUpWorkItem(
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeUp!\n");
 
-    if (devCtx->InitializationOk == 2)
+    if (devCtx->InitializationOk >= 2)
         HandleButtonPress(devCtx, VolumeUp);
-
-    devCtx->InitializationOk = TRUE;
+    else
+        devCtx->InitializationOk++;
 }
 
 void InterruptVolumeDownWorkItem(
@@ -315,10 +315,10 @@ void InterruptVolumeDownWorkItem(
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeDown!\n");
 
-    if (devCtx->InitializationOk == 2)
+    if (devCtx->InitializationOk >= 2)
         HandleButtonPress(devCtx, VolumeDown);
-
-    devCtx->InitializationOk++;
+    else
+        devCtx->InitializationOk++;
 }
 
 void InterruptCameraFocusWorkItem(
@@ -332,10 +332,10 @@ void InterruptCameraFocusWorkItem(
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from CameraFocus!\n");
 
-    if (devCtx->InitializationOk == 2)
+    if (devCtx->InitializationOk >= 2)
         HandleButtonPress(devCtx, CameraFocus);
-
-    devCtx->InitializationOk++;
+    else
+        devCtx->InitializationOk++;
 }
 
 void InterruptCameraWorkItem(
@@ -349,10 +349,10 @@ void InterruptCameraWorkItem(
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Camera!\n");
 
-    if (devCtx->InitializationOk == 2)
+    if (devCtx->InitializationOk >= 2)
         HandleButtonPress(devCtx, Camera);
-
-    devCtx->InitializationOk++;
+    else
+        devCtx->InitializationOk++;
 }
 
 void InterruptSliderWorkItem(
@@ -366,10 +366,10 @@ void InterruptSliderWorkItem(
 
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Slider!\n");
 
-    if (devCtx->InitializationOk == 2)
+    if (devCtx->InitializationOk >= 2)
         HandleButtonPress(devCtx, Slider);
-
-    devCtx->InitializationOk++;
+    else
+        devCtx->InitializationOk++;
 }
 
 BOOLEAN
