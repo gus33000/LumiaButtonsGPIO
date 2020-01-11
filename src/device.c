@@ -100,6 +100,8 @@ VOID EvaluateButtonAction(
             hidReportFromDriver.KeysData.Keyboard.LeftWin = ButtonStateUnpressed;
             hidReportFromDriver.KeysData.Keyboard.F15 = ButtonStateUnpressed;
             SendReport(deviceContext, hidReportFromDriver);
+
+            deviceContext->IgnoreButtonPresses = TRUE;
         }
         // Trigger on Volume Down being high
         else if (deviceContext->StatePower && deviceContext->StateVolumeDown && ButtonType == VolumeDown)
@@ -119,6 +121,8 @@ VOID EvaluateButtonAction(
             hidReportFromDriver.KeysData.Keyboard.LeftAlt = ButtonStateUnpressed;
             hidReportFromDriver.KeysData.Keyboard.Del = ButtonStateUnpressed;
             SendReport(deviceContext, hidReportFromDriver);
+
+            deviceContext->IgnoreButtonPresses = TRUE;
         }
         //
         // Only one key should be active at a time after checking the above combinations
@@ -127,7 +131,7 @@ VOID EvaluateButtonAction(
         else if (RelevantButtonActiveCount <= 1)
         {
             // Trigger on power being low
-            if (ButtonType == Power && !deviceContext->StatePower)
+            if (ButtonType == Power && !deviceContext->StatePower && !deviceContext->IgnoreButtonPresses)
             {
                 // Power
                 hidReportFromDriver.ReportID = REPORTID_CAPKEY_CONTROL;
@@ -140,7 +144,7 @@ VOID EvaluateButtonAction(
                 SendReport(deviceContext, hidReportFromDriver);
             }
 
-            if (ButtonType == VolumeUp)
+            if (ButtonType == VolumeUp && !deviceContext->IgnoreButtonPresses)
             {
                 // Volume Up
 
@@ -149,7 +153,7 @@ VOID EvaluateButtonAction(
                 SendReport(deviceContext, hidReportFromDriver);
             }
 
-            if (ButtonType == VolumeDown)
+            if (ButtonType == VolumeDown && !deviceContext->IgnoreButtonPresses)
             {
                 // Volume Down
 
@@ -158,7 +162,7 @@ VOID EvaluateButtonAction(
                 SendReport(deviceContext, hidReportFromDriver);
             }
 
-            if (ButtonType == CameraFocus)
+            if (ButtonType == CameraFocus && !deviceContext->IgnoreButtonPresses)
             {
                 // Camera Focus
                 // Placeholder
@@ -168,7 +172,7 @@ VOID EvaluateButtonAction(
                 SendReport(deviceContext, hidReportFromDriver);
             }
 
-            if (ButtonType == Camera)
+            if (ButtonType == Camera && !deviceContext->IgnoreButtonPresses)
             {
                 // Camera
                 // Placeholder
@@ -211,6 +215,11 @@ VOID EvaluateButtonAction(
                 SendReport(deviceContext, hidReportFromDriver);
             }
         }
+    }
+
+    if (RelevantButtonActiveCount == 0)
+    {
+        deviceContext->IgnoreButtonPresses = FALSE;
     }
 }
 
@@ -270,9 +279,12 @@ void InterruptPowerWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Power!\n");
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Power!\n");
 
-    HandleButtonPress(devCtx, Power);
+    if (devCtx->InitializationOk == 2)
+        HandleButtonPress(devCtx, Power);
+
+    devCtx->InitializationOk++;
 }
 
 void InterruptVolumeUpWorkItem(
@@ -284,9 +296,12 @@ void InterruptVolumeUpWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeUp!\n");
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeUp!\n");
 
-    HandleButtonPress(devCtx, VolumeUp);
+    if (devCtx->InitializationOk == 2)
+        HandleButtonPress(devCtx, VolumeUp);
+
+    devCtx->InitializationOk = TRUE;
 }
 
 void InterruptVolumeDownWorkItem(
@@ -298,9 +313,12 @@ void InterruptVolumeDownWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeDown!\n");
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from VolumeDown!\n");
 
-    HandleButtonPress(devCtx, VolumeDown);
+    if (devCtx->InitializationOk == 2)
+        HandleButtonPress(devCtx, VolumeDown);
+
+    devCtx->InitializationOk++;
 }
 
 void InterruptCameraFocusWorkItem(
@@ -312,9 +330,12 @@ void InterruptCameraFocusWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from CameraFocus!\n");
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from CameraFocus!\n");
 
-    HandleButtonPress(devCtx, CameraFocus);
+    if (devCtx->InitializationOk == 2)
+        HandleButtonPress(devCtx, CameraFocus);
+
+    devCtx->InitializationOk++;
 }
 
 void InterruptCameraWorkItem(
@@ -326,9 +347,12 @@ void InterruptCameraWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Camera!\n");
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Camera!\n");
 
-    HandleButtonPress(devCtx, Camera);
+    if (devCtx->InitializationOk == 2)
+        HandleButtonPress(devCtx, Camera);
+
+    devCtx->InitializationOk++;
 }
 
 void InterruptSliderWorkItem(
@@ -340,9 +364,12 @@ void InterruptSliderWorkItem(
 
     PDEVICE_EXTENSION devCtx = GetDeviceContext(AssociatedObject);
 
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Slider!\n");
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "LumiaButtonsGPIO: Got an interrupt from Slider!\n");
 
-    HandleButtonPress(devCtx, Slider);
+    if (devCtx->InitializationOk == 2)
+        HandleButtonPress(devCtx, Slider);
+
+    devCtx->InitializationOk++;
 }
 
 BOOLEAN
